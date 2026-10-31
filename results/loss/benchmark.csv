@@ -1,0 +1,8 @@
+# NOT detection AP; cannot be compared with Table 2
+# Columns: variant, mean/std final IoU, steps to IoU>=0.5, % seeds that reached 0.5, NaN count, oscillation (std last 50 steps)
+variant,mean_final_iou,std_final_iou,mean_steps_to_half,pct_reached_half,total_nan_count,mean_oscillation,n_seeds
+ciou,0.5088636875152588,0.00931392573167476,488.3333333333333,100.0,0,0.010674817511881714,3
+scale_only,0.3922837475935618,0.006734738738889807,nan,0.0,0,0.006007416268094483,3
+scale_shape,0.3922981421152751,0.006735312237898874,nan,0.0,0,0.006008053261426387,3
+quality_only,0.4589523375034332,0.008289736774708692,nan,0.0,0,0.006373866324518332,3
+ssq,0.3138652741909027,0.005895006263536427,nan,0.0,0,0.0008282249834157675,3
