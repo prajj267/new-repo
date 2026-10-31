@@ -39,14 +39,22 @@ loss:
 
 # ── Detector ────────────────────────────────────────────────
 detector:
-  # Weights path — swap to Anti-UAV baseline when available
-  weights: "yolov5s"      # torch.hub model name OR path to .pt file
-  source: "hub"           # "hub" (first run) | "local" (offline, uses reference/yolov5/)
-  conf_thresh: 0.25       # detection confidence threshold
-  iou_thresh_nms: 0.45    # NMS IoU threshold
-  imgsz: 640              # inference image size
-  class_agnostic: false   # if true, suppress class filtering (all detections kept)
-  device: "cpu"           # must be cpu
+  # Weights: "gt_simulation" uses GT boxes + noise (current fallback).
+  # Set weights: "path/to/file.pt" and source: "local_pt" for real weights.
+  # See design.md section 4.1 for full disclaimer.
+  weights: "gt_simulation"
+  source: "gt_simulation"
+  conf_thresh: 0.25
+  iou_thresh_nms: 0.45
+  imgsz: 640
+  class_agnostic: false
+  device: "cpu"
+
+  # GT simulation parameters (used when source="gt_simulation")
+  sim_centre_sigma: 5.0    # Gaussian noise std on cx, cy (pixels)
+  sim_size_sigma: 2.0      # Gaussian noise std on w, h (pixels)
+  sim_dropout: 0.05        # probability of dropping a visible frame's detection
+  sim_seed: 42             # RNG seed for reproducibility
 
 # ── Tracker ─────────────────────────────────────────────────
 tracker:

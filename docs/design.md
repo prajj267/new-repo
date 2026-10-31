@@ -187,11 +187,29 @@ If SSQ does not beat CIoU, this is reported plainly. No post-hoc tuning on repor
 
 ## 4. Detector wrapper (`src/detector/yolov5_wrapper.py`) — Amendment B
 
-### 4.1 Fallback detector
-No `Baseline_code_1.zip` available. Using official `yolov5s.pt` (COCO-pretrained).
+### 4.1 Fallback detector — GT simulation (second fallback)
+
+Neither `Baseline_code_1.zip` nor any pretrained `.pt` weights are available on this
+machine, and internet access to download them is blocked (DNS resolution failure to
+`download.pytorch.org` and `github.com`).
+
+A **GT-based simulated detector** is used instead:
+- Output: GT box + Gaussian noise (centre σ=5 px, size σ=2 px)
+- Random frame dropout: p=0.05 (5% of visible frames produce no detection)
+- Controlled by config keys `detector.sim_centre_sigma`, `detector.sim_size_sigma`,
+  `detector.sim_dropout`
+- Cache records `"detector_weights": "gt_simulation"` so it is unambiguous
+
 **Report disclaimer required:**
-> "Detections are produced by YOLOv5s pretrained on COCO, not the Anti-UAV baseline model.
-> Tracking results are therefore not directly comparable with Table 3 of the paper."
+> "No pretrained detector weights were available on the test machine (internet access
+> blocked). A GT-based simulated detector is used: GT boxes with added Gaussian noise
+> (centre σ=5 px, size σ=2 px) and 5% random frame dropout. This isolates the tracker
+> ablation from detector recall. Results are NOT comparable with Table 3 of the paper."
+
+**To use real weights when available:**
+1. Place `yolov5s.pt` (or any YOLO `.pt`) at `reference/yolov5s.pt`
+2. Set `detector.weights: reference/yolov5s.pt` and `detector.source: local_pt`
+3. Re-run `scripts/build_detection_cache.py --force`
 
 ### 4.2 Offline / vendored mode
 On first call, `torch.hub.load("ultralytics/yolov5", ...)` clones the repo to
