@@ -1,0 +1,36 @@
+# Dist-Tracker CPU reproduction — pinned requirements
+# Python 3.12.10, CPU-only PyTorch (no CUDA anywhere)
+#
+# Note: torch 2.2.2 CPU wheel was unavailable (PyTorch CDN unreachable).
+# Using torch 2.14.1+cpu which is installed locally. All other packages
+# are consistent with this version. No GPU dependency in any package.
+
+# ── Core deep learning (CPU wheel) ─────────────────────────────────────────
+torch==2.14.1
+torchvision==0.29.1
+
+# ── Computer vision ─────────────────────────────────────────────────────────
+opencv-python==4.10.0.84
+
+# ── Scientific computing ────────────────────────────────────────────────────
+numpy==1.26.4
+scipy==1.17.1
+
+# ── Tracking evaluation ─────────────────────────────────────────────────────
+motmetrics==1.4.0
+pandas==2.2.3
+
+# ── Plotting ────────────────────────────────────────────────────────────────
+matplotlib==3.10.9
+seaborn==0.13.2
+
+# ── Image I/O ───────────────────────────────────────────────────────────────
+Pillow==10.4.0
+
+# ── Config / CLI / utils ────────────────────────────────────────────────────
+PyYAML==6.0.1
+tqdm==4.70.1
+requests==2.34.2
+
+# ── Testing ─────────────────────────────────────────────────────────────────
+pytest==8.3.4

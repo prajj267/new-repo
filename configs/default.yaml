@@ -1,0 +1,85 @@
+# ============================================================
+# Dist-Tracker CPU Reproduction — Default Configuration
+# All hyperparameters live here. Never hard-code them in src/.
+# Every ambiguity is documented in docs/open_questions.md.
+# ============================================================
+
+# ── Reproducibility ─────────────────────────────────────────
+seed: 42
+
+# ── Data ────────────────────────────────────────────────────
+data:
+  # Absolute path to the dataset root (contains train/, val/, test/)
+  root: "c:/Projects/ipa_paper/dataset"
+  split: "val"            # ONLY val is used. test is never read.
+  num_sequences: 15       # how many val sequences to use
+  frame_stride: 5         # use every Nth frame (see design.md §1.3)
+  max_frames_per_sequence: 200  # cap per sequence after striding
+  sequence_seed: 42       # seed for selecting the subset
+  img_w: 640              # frame width  (confirmed from dataset)
+  img_h: 512              # frame height (confirmed from dataset)
+
+# ── SSQ Loss ────────────────────────────────────────────────
+loss:
+  # Scale loss (Eq. 3)
+  w_s: 0.6                # paper says "> 0.5" only  [OQ-1]
+  size_cov_scale: 1.0     # 1.0 = literal Eq.3; 0.25 = NWD convention [OQ-1b]
+  use_normalised_coords: false   # divide cx,cy,w,h by img dims before loss [OQ-2]
+  use_nwd_exp: false      # wrap scale_loss in 1-exp(-L/C)  [OQ-2]
+  nwd_exp_C: 25.0         # normalisation constant for NWD exponential
+
+  # Shape loss (Eq. 4)
+  shape_scale: 2.0        # exponent on w_t, h_t  [OQ-3]
+
+  # Quality loss (Eq. 5-6)
+  sigma: 2.0              # exponent on (1-IoU)  [OQ-5]
+
+  # Common
+  eps: 1.0e-7             # division guard
+
+# ── Detector ────────────────────────────────────────────────
+detector:
+  # Weights path — swap to Anti-UAV baseline when available
+  weights: "yolov5s"      # torch.hub model name OR path to .pt file
+  source: "hub"           # "hub" (first run) | "local" (offline, uses reference/yolov5/)
+  conf_thresh: 0.25       # detection confidence threshold
+  iou_thresh_nms: 0.45    # NMS IoU threshold
+  imgsz: 640              # inference image size
+  class_agnostic: false   # if true, suppress class filtering (all detections kept)
+  device: "cpu"           # must be cpu
+
+# ── Tracker ─────────────────────────────────────────────────
+tracker:
+  gamma: 0.25             # cost fusion weight (Eq. 10); paper value
+  l2_norm: "diagonal"     # "diagonal" (÷√(W²+H²)) | "fixed" [OQ-6]
+  l2_norm_fixed: 512      # denominator when l2_norm="fixed"
+  match_thresh: 0.8       # Hungarian assignment gate  [OQ-7]
+  tau: 0.01               # min confidence to enter tracker (Algorithm 1)
+  eta: 0.25               # min confidence to initialise new track
+  track_buffer: 0         # frames to keep unmatched track; 0 = delete immediately
+  min_hits: 1             # hits before track is confirmed
+  init_mode: "detector"   # "detector" | "first_frame_gt"
+
+# ── Kalman filter ────────────────────────────────────────────
+kalman:
+  Q_scale: 1.0            # process noise scale
+  R_scale: 1.0            # measurement noise scale
+
+# ── CMC ─────────────────────────────────────────────────────
+cmc:
+  enabled: true
+  max_corners: 200
+  quality_level: 0.01
+  min_distance: 30
+  block_size: 3
+  ransac_thresh: 3.0
+
+# ── Evaluation ───────────────────────────────────────────────
+eval:
+  iou_thresholds: [0.5, 0.25]   # report at both; boxes are tiny
+
+# ── Paths ────────────────────────────────────────────────────
+paths:
+  cache_detections: "cache/detections"
+  cache_affines: "cache/affines"
+  results: "results"

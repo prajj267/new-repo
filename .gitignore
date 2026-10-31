@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Dataset — lives outside the repo
+/data/
+*.mp4
+*.avi
+
+# Model weights
+*.pt
+*.pth
+*.ckpt
+
+# Vendored YOLOv5 repo (large; re-cloned by build_detection_cache.py)
+# Keep the directory placeholder but not the contents
+reference/yolov5/*
+!reference/yolov5/.gitkeep
+
+# Cache (rebuilt by scripts)
+cache/detections/
+cache/affines/
+
+# Large result images (keep CSV and markdown, skip PNG blobs in git)
+# Comment this out if you want plots tracked
+# results/**/*.png
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Pytest
+.pytest_cache/
