@@ -36,6 +36,7 @@ python src/data/visualize.py --config configs/default.yaml
 ### Stage 2 — Run loss unit tests
 ```
 pytest tests/test_ssq_loss.py -v
+# 35 passed
 ```
 
 ### Stage 3 — Synthetic tiny-box regression benchmark (Part A)
@@ -45,6 +46,7 @@ python scripts/run_loss_benchmark.py --config configs/default.yaml --seeds 0 1 2
 #         results/loss/benchmark.md
 #         results/loss/convergence.png
 #         results/loss/grad_vs_size.png
+# runtime: ~35s on CPU
 ```
 > NOT detection AP. Cannot be compared with Table 2.
 
@@ -52,15 +54,17 @@ python scripts/run_loss_benchmark.py --config configs/default.yaml --seeds 0 1 2
 ```
 python scripts/build_detection_cache.py --config configs/default.yaml
 # output: cache/detections/<seq_name>.json  (one per sequence)
-# prints recall@0.50 and recall@0.25 after first 3 sequences
+# runtime: <1s (GT simulation mode)
 ```
 
 ### Stage 5 — Build CMC cache, run tracker unit tests
 ```
 python scripts/build_cmc_cache.py --config configs/default.yaml
 # output: cache/affines/<seq_name>.json
+# runtime: ~75s on CPU
 
 pytest tests/test_tracker.py -v
+# 32 passed
 ```
 
 ### Stage 6 — Tracker ablations (Part B)
@@ -69,6 +73,13 @@ python scripts/run_tracker.py --config configs/default.yaml
 # output: results/tracker/ablations.csv
 #         results/tracker/ablations.md
 #         results/tracker/mota_ablation.png
+# runtime: ~33s on CPU
+```
+
+### Run all unit tests
+```
+pytest tests/ -v
+# 34 + 35 + 32 = 101 passed
 ```
 
 ---
