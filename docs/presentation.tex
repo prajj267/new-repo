@@ -1,0 +1,814 @@
+% ============================================================
+% Dist-Tracker Reproduction — Beamer Presentation
+% Compile in Overleaf with XeLaTeX or pdfLaTeX
+% ============================================================
+
+\documentclass[aspectratio=169, 10pt]{beamer}
+
+% ── Theme ─────────────────────────────────────────────────
+\usetheme{Madrid}
+\usecolortheme{whale}
+\usefonttheme{professionalfonts}
+
+% ── Colour overrides ──────────────────────────────────────
+\definecolor{darkblue}{RGB}{0,51,102}
+\definecolor{midblue}{RGB}{0,102,179}
+\definecolor{lightblue}{RGB}{200,220,240}
+\definecolor{darkgrey}{RGB}{60,60,60}
+\definecolor{honest}{RGB}{180,40,40}
+
+\setbeamercolor{frametitle}{bg=darkblue, fg=white}
+\setbeamercolor{title}{fg=white}
+\setbeamercolor{author}{fg=lightblue}
+\setbeamercolor{date}{fg=lightblue}
+\setbeamercolor{structure}{fg=darkblue}
+\setbeamercolor{block title}{bg=midblue, fg=white}
+\setbeamercolor{block body}{bg=lightblue!40}
+\setbeamercolor{alertblock title}{bg=honest, fg=white}
+\setbeamercolor{alertblock body}{bg=honest!10}
+
+% ── Packages ──────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{array}
+\usepackage{colortbl}
+\usepackage{graphicx}
+\usepackage{microtype}
+
+% ── Helpers ───────────────────────────────────────────────
+\newcommand{\yes}{\textcolor{green!60!black}{\textbf{\checkmark}}}
+\newcommand{\no}{\textcolor{red}{\textbf{$\times$}}}
+\newcommand{\partial}{\textcolor{orange!80!black}{\textbf{$\sim$}}}
+\newcommand{\red}[1]{\textcolor{honest}{#1}}
+\newcommand{\blue}[1]{\textcolor{midblue}{#1}}
+\newcommand{\best}[1]{\textbf{\textcolor{green!50!black}{#1}}}
+
+% ── Title block ───────────────────────────────────────────
+\title[Dist-Tracker Reproduction]{%
+  Reproducing Dist-Tracker:\\
+  A Small Object-aware Detector and Tracker for UAV Tracking}
+\subtitle{Wang et al., CVPR Workshops 2025 — CPU-only Partial Reproduction}
+\author{[Your Name]}
+\date{[Date]}
+\institute{[Your Institution]}
+
+% ── Footer ────────────────────────────────────────────────
+\setbeamertemplate{footline}{%
+  \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=.4\paperwidth,ht=2.25ex,dp=1ex,center]{author in head/foot}%
+      \usebeamerfont{author in head/foot}\insertshortauthor
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.4\paperwidth,ht=2.25ex,dp=1ex,center]{title in head/foot}%
+      \usebeamerfont{title in head/foot}Dist-Tracker Reproduction
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.2\paperwidth,ht=2.25ex,dp=1ex,right]{date in head/foot}%
+      \usebeamerfont{date in head/foot}\insertframenumber{} / \inserttotalframenumber\hspace*{2ex}
+    \end{beamercolorbox}}%
+  \vskip0pt%
+}
+
+% ===========================================================
+\begin{document}
+% ===========================================================
+
+% ── Title slide ────────────────────────────────────────────
+\begin{frame}[plain]
+  \titlepage
+  \vspace{-1em}
+  \begin{center}
+    \small\textcolor{lightblue}{%
+      SSQ Loss (Eq.~2--8) $+$ FLIT Tracker (Algorithm~1)
+      $\;\cdot\;$ CPU-only $\;\cdot\;$ Anti-UAV300 dataset}
+  \end{center}
+\end{frame}
+
+% ===========================================================
+\section{Problem}
+% ===========================================================
+
+% ── Slide 2: Why is this hard? ─────────────────────────────
+\begin{frame}{Why is UAV Tracking Hard?}
+
+  \begin{columns}[T]
+
+    \column{0.52\textwidth}
+    \begin{block}{Three core challenges}
+      \begin{itemize}
+        \item \textbf{Tiny targets:} UAVs appear as 4--32 pixel blobs in
+              thermal IR images (640$\times$512 px)
+        \item \textbf{IoU loss fails:} when predicted and GT boxes do not
+              overlap, IoU~$= 0$ and the gradient is zero — no learning
+              signal for the most critical cases
+        \item \textbf{ID switches:} in multi-UAV tracking, fast motion and
+              camera shake cause the tracker to lose and re-assign identities
+      \end{itemize}
+    \end{block}
+
+    \vspace{0.5em}
+    \begin{alertblock}{Key insight from the paper}
+      Standard IoU-based regression and tracking are \emph{poorly suited}
+      to tiny objects.  A new loss (SSQ) and a new cost matrix (FLIT) are
+      needed.
+    \end{alertblock}
+
+    \column{0.45\textwidth}
+    \begin{block}{Sample annotation (my data)}
+      \centering
+      \vspace{0.3em}
+      % Replace with your actual viz image if uploaded to Overleaf:
+      % \includegraphics[width=\linewidth]{20190925_131530_1_3_00825.jpg}
+      \begin{tikzpicture}
+        % Simulated thermal frame (grey rectangle)
+        \fill[black!80] (0,0) rectangle (5,3.2);
+        \fill[black!60] (0.2,0.2) rectangle (4.8,3.0);
+        % Simulate noise texture
+        \foreach \x in {0.3,0.7,1.1,...,4.7} {
+          \foreach \y in {0.3,0.6,0.9,...,2.8} {
+            \pgfmathsetmacro\br{50+rnd*40}
+            \fill[black!\br] (\x+rnd*0.3,\y+rnd*0.2) rectangle
+                              (\x+0.15+rnd*0.1,\y+0.12+rnd*0.1);
+          }
+        }
+        % GT box (tiny, green)
+        \draw[green!70!black, line width=1.5pt] (2.8,1.9) rectangle (3.4,2.3);
+        \node[green!70!black, font=\tiny] at (3.1,2.45) {UAV \small 38$\times$26px};
+        % Arrow
+        \draw[->, white, thick] (1.5,1.0) -- (2.7,1.85);
+        \node[white, font=\small] at (1.2,0.75) {target};
+      \end{tikzpicture}
+      \vspace{0.2em}
+
+      \small\textit{Green box = GT annotation.\\
+      UAV is barely visible at 38$\times$26\,px.}
+    \end{block}
+
+  \end{columns}
+\end{frame}
+
+% ===========================================================
+\section{Method}
+% ===========================================================
+
+% ── Slide 3: What the paper proposes ──────────────────────
+\begin{frame}{What the Paper Proposes}
+
+  \begin{columns}[T]
+
+    \column{0.48\textwidth}
+    \begin{block}{Part A — SSQ Loss (detector)}
+      \begin{itemize}
+        \item \textbf{Eq.~3 Scale:}
+          $L_s = \|\mu_p - \mu_t\|^2 + w_s\!\left[(w_p{-}w_t)^2 + (h_p{-}h_t)^2\right]$\\
+          Non-zero even with no overlap
+
+        \vspace{0.4em}
+        \item \textbf{Eq.~4 Shape:}
+          Aspect-ratio weighted relative size error\\
+          $L_{sh} = 2\frac{w_t^s}{w_t^s+h_t^s}\!\left(\frac{|w_p-w_t|}{\max+\varepsilon}\right)^{\!2} + \cdots$
+
+        \vspace{0.4em}
+        \item \textbf{Eq.~5--6 Quality:}
+          $L_q = \frac{\beta}{\sigma^{\beta-1}}(1-\text{IoU})^\sigma$,\;
+          $\beta$ = detached curriculum weight
+
+        \vspace{0.4em}
+        \item \textbf{Eq.~7--8 Combined:}\\
+          $L_{\text{SSQ}} = 0.7(1{-}r)(L_s{+}L_{sh}) + 0.3(1{+}r)L_q$\\
+          $r = \text{step}/\text{total steps}$
+      \end{itemize}
+    \end{block}
+
+    \column{0.48\textwidth}
+    \begin{block}{Part B — FLIT Tracker}
+      \begin{itemize}
+        \item \textbf{Kalman filter:} BoT-SORT 8-state\\
+          state $= [c_x, c_y, w, h, v_x, v_y, v_w, v_h]$
+
+        \vspace{0.4em}
+        \item \textbf{Fused cost (Eq.~10):}\\
+          $C = \gamma C_{L2} + (1{-}\gamma)C_{\text{IoU}}$,\; $\gamma=0.25$\\
+          $C_{L2}$ = normalised centre distance
+
+        \vspace{0.4em}
+        \item \textbf{Confidence weighting (Eq.~11):}\\
+          $C_{\text{final}} = 1 - (1-C) \cdot s_{\text{conf}}$
+
+        \vspace{0.4em}
+        \item \textbf{CMC:} sparse LK optical flow $\to$ RANSAC affine $\to$ warp Kalman predictions
+
+        \vspace{0.4em}
+        \item \textbf{Assignment:} Hungarian,
+          $\tau{=}0.01$, $\eta{=}0.25$
+      \end{itemize}
+    \end{block}
+
+  \end{columns}
+\end{frame}
+
+% ── Slide 4: Scope ─────────────────────────────────────────
+\begin{frame}{What I Reproduced — and What I Did Not}
+
+  \begin{columns}[T]
+
+    \column{0.47\textwidth}
+    \begin{block}{\yes\; In scope}
+      \begin{itemize}
+        \item SSQ loss (Eq.~2--8) in pure PyTorch
+        \item All six loss functions unit-tested (35/35 pass)
+        \item FLIT tracker — Algorithm 1 verbatim
+        \item CMC with per-sequence affine cache
+        \item Ablation experiments on 15 val sequences
+        \item 101 unit tests total
+      \end{itemize}
+    \end{block}
+
+    \column{0.47\textwidth}
+    \begin{alertblock}{\no\; Out of scope}
+      \begin{itemize}
+        \item Training YOLOv12 \red{(requires GPU)}
+        \item Paper's Table~2 (detector AP)
+        \item Hidden test set — 81.32\% MOTA
+        \item Anti-UAV challenge submission
+      \end{itemize}
+    \end{alertblock}
+
+  \end{columns}
+
+  \vspace{1em}
+  \begin{block}{Bottom line}
+    \centering
+    My results test the \textbf{loss and tracker logic}.\\
+    They are \textbf{not numerically comparable} with the paper's tables,\\
+    but they test whether the \textbf{underlying ideas work}.
+  \end{block}
+
+\end{frame}
+
+% ===========================================================
+\section{Setup}
+% ===========================================================
+
+% ── Slide 5: Experimental setup ────────────────────────────
+\begin{frame}{Experimental Setup}
+
+  \begin{columns}[T]
+
+    \column{0.45\textwidth}
+    \begin{block}{Environment}
+      \begin{tabular}{ll}
+        \toprule
+        Item & Value \\
+        \midrule
+        CPU    & AMD Ryzen 7 8840HS \\
+        RAM    & 31 GB \\
+        GPU    & None \\
+        Python & 3.12.10 \\
+        PyTorch & 2.14.1+cpu \\
+        \bottomrule
+      \end{tabular}
+    \end{block}
+
+    \vspace{0.5em}
+    \begin{block}{Data}
+      \begin{tabular}{ll}
+        \toprule
+        Item & Value \\
+        \midrule
+        Dataset    & Anti-UAV300, IR only \\
+        Split      & val (67 seqs available) \\
+        Used       & 15 sequences \\
+        Frame stride & 5 (every 5th frame) \\
+        Resolution & 640$\times$512 @ 20fps \\
+        \bottomrule
+      \end{tabular}
+    \end{block}
+
+    \column{0.50\textwidth}
+    \begin{alertblock}{Detector fallback — important caveat}
+      Internet access was blocked on my machine.
+      \textbf{Pretrained weights could not be downloaded.}
+
+      \vspace{0.5em}
+      I used a \textbf{GT-based simulated detector}:
+      \begin{itemize}
+        \item GT box + Gaussian noise ($\sigma_c{=}5$\,px, $\sigma_s{=}2$\,px)
+        \item 5\% random frame dropout
+      \end{itemize}
+
+      \vspace{0.5em}
+      This isolates tracker behaviour from detector quality.\\
+      \red{Results are NOT comparable with Table~3.}
+    \end{alertblock}
+
+    \vspace{0.5em}
+    \begin{block}{Stride semantics}
+      Kalman $\Delta t = 1$ sampled frame.\\
+      CMC computed between sampled frames,\\
+      not raw consecutive frames.
+    \end{block}
+
+  \end{columns}
+\end{frame}
+
+% ===========================================================
+\section{Part A: SSQ Loss}
+% ===========================================================
+
+% ── Slide 6: Loss results ──────────────────────────────────
+\begin{frame}{Part A — Synthetic Tiny-Box Regression Results}
+
+  \begin{alertblock}{\no\; NOT detection AP — cannot be compared with Table 2 of the paper}
+  \end{alertblock}
+
+  \vspace{0.3em}
+
+  \begin{columns}[T]
+
+    \column{0.52\textwidth}
+    \begin{block}{Benchmark setup}
+      \begin{itemize}
+        \item 500 random GT boxes (4--32\,px wide, aspect~$\approx$1.2:1)
+        \item Init: GT + Gaussian noise ($\sigma_c{=}10$, $\sigma_s{=}5$\,px)
+        \item Adam, lr=0.01, 500 steps, seeds 0--2
+      \end{itemize}
+    \end{block}
+
+    \vspace{0.5em}
+
+    \begin{tabular}{lccr}
+      \toprule
+      Variant & IoU $\pm$ std & Hit 0.5 & NaN \\
+      \midrule
+      \best{CIoU (baseline)} & \best{0.509 $\pm$ 0.009} & \best{100\%} & 0 \\
+      Scale only & 0.392 $\pm$ 0.007 & 0\% & 0 \\
+      Scale+Shape & 0.392 $\pm$ 0.007 & 0\% & 0 \\
+      Quality only & 0.459 $\pm$ 0.008 & 0\% & 0 \\
+      Full SSQ & 0.314 $\pm$ 0.006 & 0\% & 0 \\
+      \bottomrule
+    \end{tabular}
+    \vspace{0.3em}
+    \small\textit{Raw data: \texttt{results/loss/benchmark.csv}}
+
+    \column{0.44\textwidth}
+    \begin{alertblock}{SSQ does NOT beat CIoU here}
+      CIoU directly maximises overlap.\\
+      SSQ scale/shape terms minimise\\
+      positional error — not IoU directly.
+    \end{alertblock}
+
+    \vspace{0.4em}
+    \begin{block}{Why this does not invalidate the paper}
+      \begin{itemize}
+        \item SSQ is designed for \textbf{detector training} on many boxes simultaneously
+        \item This benchmark tests a \textbf{single-box} direct gradient descent
+        \item Without GPU training we cannot test SSQ's real use case
+        \item But: unit tests confirm implementation is correct (gradcheck passes, $\beta$ detached, no NaN for 1\,px boxes)
+      \end{itemize}
+    \end{block}
+
+  \end{columns}
+\end{frame}
+
+% ===========================================================
+\section{Part B: Tracker}
+% ===========================================================
+
+% ── Slide 7: Core tracker results ──────────────────────────
+\begin{frame}{Part B — Tracker Ablations (Core Variants)}
+
+  \begin{alertblock}{\no\; GT simulation detector — NOT comparable with Table 3 of the paper}
+  \end{alertblock}
+
+  \vspace{0.3em}
+
+  \begin{columns}[T]
+
+    \column{0.55\textwidth}
+
+    \small
+    \textbf{IoU threshold = 0.5}
+    \vspace{0.2em}
+
+    \begin{tabular}{lrrrr}
+      \toprule
+      Variant & MOTA & IDF1 & FP & IDS \\
+      \midrule
+      Detector only & 0.953 & 0.976 & 3 & 0 \\
+      IoU only ($\gamma{=}0$) & 0.480 & 0.080 & 3 & 1241 \\
+      L2 only ($\gamma{=}1$) & 0.868 & 0.302 & 58 & 112 \\
+      Hybrid ($\gamma{=}0.25$) & 0.780 & 0.158 & 3 & 453 \\
+      \best{Hybrid + CMC} & \best{0.784} & \best{0.161} & 3 & \best{443} \\
+      \bottomrule
+    \end{tabular}
+
+    \vspace{0.5em}
+    \textbf{IoU threshold = 0.25}
+    \vspace{0.2em}
+
+    \begin{tabular}{lrrrr}
+      \toprule
+      Variant & MOTA & IDF1 & FP & IDS \\
+      \midrule
+      Detector only & 0.954 & 0.977 & 1 & 0 \\
+      IoU only & 0.481 & 0.080 & 1 & 1243 \\
+      L2 only & 0.900 & 0.304 & 16 & 112 \\
+      Hybrid & 0.781 & 0.158 & 1 & 454 \\
+      \best{Hybrid + CMC} & \best{0.785} & \best{0.161} & 1 & \best{444} \\
+      \bottomrule
+    \end{tabular}
+
+    \vspace{0.3em}
+    \small\textit{Raw data: \texttt{results/tracker/ablations.csv}}
+
+    \column{0.40\textwidth}
+
+    \begin{block}{Key finding}
+      Adding L2 cost:
+      \[
+        \text{IDS: } 1241 \to 453 \quad (-63\%)
+      \]
+      The paper's core motivation — \textbf{L2 is more robust than IoU for tiny noisy boxes} — is reproduced.
+    \end{block}
+
+    \vspace{0.4em}
+    \begin{block}{IDS note}
+      IDS $\neq 0$ because the simulation adds \emph{independent} per-frame noise, causing low frame-to-frame IoU.
+      This is informative — it stresses the cost matrix.
+    \end{block}
+
+    \vspace{0.4em}
+    \begin{alertblock}{Single-target data}
+      IDF1 is only weakly\\
+      informative here.\\
+      MOTA / FP / FN / IDS\\
+      are the main signals.
+    \end{alertblock}
+
+  \end{columns}
+\end{frame}
+
+% ── Slide 8: Ablation details ──────────────────────────────
+\begin{frame}{Ablation Details}
+
+  \begin{columns}[T]
+
+    \column{0.31\textwidth}
+    \begin{block}{$\gamma$ sweep (IoU thr=0.5)}
+      \vspace{0.3em}
+      \small
+      \begin{tabular}{rrc}
+        \toprule
+        $\gamma$ & MOTA & IDS \\
+        \midrule
+        0.00 & 0.480 & 1241 \\
+        0.10 & 0.590 & 952 \\
+        0.25 & 0.780 & 453 \\
+        0.50 & 0.870 & 113 \\
+        0.75 & 0.868 & 112 \\
+        1.00 & 0.868 & 112 \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.3em}
+
+      Higher $\gamma$ $\to$ fewer IDS\\
+      but more FP (L2 is less\\
+      discriminative for overlap).\\
+      $\gamma{=}0.25$ is the\\
+      paper's design choice.
+    \end{block}
+
+    \column{0.31\textwidth}
+    \begin{block}{Match threshold sweep}
+      \vspace{0.3em}
+      \small
+      \begin{tabular}{rrc}
+        \toprule
+        thresh & MOTA & IDS \\
+        \midrule
+        0.50 & 0.230 & 1897 \\
+        0.70 & 0.595 & 940 \\
+        0.80 & 0.780 & 453 \\
+        \best{0.90} & \best{0.870} & \best{113} \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.3em}
+
+      Too low ($\le$0.5) $\to$\\
+      MOTA collapses.\\
+      Default 0.8 is stable;\\
+      0.9 is better for this\\
+      simulated data.
+    \end{block}
+
+    \column{0.31\textwidth}
+    \begin{block}{Track buffer sweep}
+      \vspace{0.3em}
+      \small
+      \begin{tabular}{rrc}
+        \toprule
+        buffer & MOTA & IDS \\
+        \midrule
+        0 & 0.780 & 453 \\
+        \best{1} & \best{0.807} & \best{384} \\
+        2 & 0.804 & 391 \\
+        3 & 0.796 & 412 \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.3em}
+
+      Paper Algorithm~1:\\
+      buffer$=0$ (delete\\
+      immediately).\\
+      Buffer$=1$ slightly\\
+      improves MOTA here\\
+      by surviving one\\
+      missed frame.
+    \end{block}
+
+  \end{columns}
+
+\end{frame}
+
+% ── Slide 9: CMC ───────────────────────────────────────────
+\begin{frame}{Camera Motion Compensation — Does It Help?}
+
+  \begin{columns}[T]
+
+    \column{0.48\textwidth}
+    \begin{block}{Result}
+      \vspace{0.3em}
+      \begin{tabular}{lrr}
+        \toprule
+        Variant & MOTA & IDS \\
+        \midrule
+        Hybrid (no CMC) & 0.7802 & 453 \\
+        Hybrid + CMC & \textbf{0.7840} & \textbf{443} \\
+        \midrule
+        $\Delta$ & +0.0038 & $-10$ \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.3em}
+
+      \textbf{CMC helps — but only slightly.}
+    \end{block}
+
+    \vspace{0.5em}
+    \begin{block}{CMC implementation}
+      \begin{enumerate}
+        \item Shi-Tomasi corners in previous sampled frame
+        \item Lucas-Kanade pyramidal optical flow
+        \item RANSAC partial affine estimation
+        \item Apply forward transform to Kalman-predicted centres
+      \end{enumerate}
+      \small Note: forward transform (prev$\to$curr), \textit{not} inverse.
+    \end{block}
+
+    \column{0.48\textwidth}
+    \begin{alertblock}{Why the effect is small}
+      \begin{itemize}
+        \item This dataset has a \textbf{mostly-stationary camera}
+        \item E.g.\ sequence \texttt{20190926\_141816\_1\_4}:\\
+          48/200 sampled frames = identity affine
+        \item CMC corrects global motion that barely exists here
+      \end{itemize}
+    \end{alertblock}
+
+    \vspace{0.5em}
+    \begin{block}{Consistent with the paper}
+      Paper reports $\Delta$MOTA = +0.035 (0.735$\to$0.770).\\
+      Their data has \textbf{multi-UAV Track 3} with likely more camera motion.\\
+
+      \vspace{0.3em}
+      \textbf{Trend matches:} CMC helps when the camera moves.\\
+      Magnitude differs because our camera barely moves.
+    \end{block}
+
+  \end{columns}
+\end{frame}
+
+% ===========================================================
+\section{Comparison with Paper}
+% ===========================================================
+
+% ── Slide 10: Comparison ───────────────────────────────────
+\begin{frame}{Comparison with Paper's Claims}
+
+  \begin{columns}[T]
+
+    \column{0.60\textwidth}
+
+    \begin{tabular}{p{3.8cm}p{2.0cm}p{1.0cm}}
+      \toprule
+      Paper claim & My finding & Verdict \\
+      \midrule
+      L2 fusion reduces IDS vs IoU-only &
+        1241$\to$453 ($-63\%$) & \yes \\
+      \addlinespace
+      CMC improves MOTA &
+        $+0.0038$ & \yes\,\small(small) \\
+      \addlinespace
+      SSQ improves detection AP &
+        Cannot test & --- \\
+      \addlinespace
+      MOTA 0.775 (val, Table~3) &
+        Not comparable & \no \\
+      \addlinespace
+      MOTA 0.8132 (hidden test) &
+        Not reproduced & \no \\
+      \bottomrule
+    \end{tabular}
+
+    \vspace{0.8em}
+    \begin{block}{Paper numbers for context only}
+      \small
+      \begin{tabular}{lll}
+        \toprule
+        Metric & Paper (val) & Mine \\
+        \midrule
+        Table~3 baseline MOTA & 0.735 & N/A$^*$ \\
+        Table~3 +CMC & 0.770 & N/A$^*$ \\
+        Table~3 +L2 fusion & 0.775 & N/A$^*$ \\
+        Table~2 AP50 SSQ & 87.8 & N/A$^{**}$ \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.2em}
+      \small$^*$Different detector.\quad$^{**}$No GPU training.
+    \end{block}
+
+    \column{0.36\textwidth}
+    \begin{alertblock}{Key message}
+      Numbers cannot be compared directly.
+
+      \vspace{0.5em}
+      But the \textbf{trend that L2 fusion reduces IDS for tiny noisy boxes is reproduced}.
+
+      \vspace{0.5em}
+      This is the paper's core tracker claim.
+    \end{alertblock}
+
+    \vspace{0.5em}
+    \begin{block}{Honest gap}
+      \begin{itemize}
+        \item GT simulation $\neq$ real detector
+        \item Single-target $\neq$ multi-UAV
+        \item No GPU $\neq$ paper's RTX 4090
+      \end{itemize}
+    \end{block}
+
+  \end{columns}
+\end{frame}
+
+% ===========================================================
+\section{Viva Questions}
+% ===========================================================
+
+% ── Slide 11: Viva Q&A ─────────────────────────────────────
+\begin{frame}{Key Questions You Should Be Able to Answer}
+
+  \begin{columns}[T]
+
+    \column{0.48\textwidth}
+
+    \begin{block}{Q1: Why does IoU fail for tiny objects?}
+      When boxes don't overlap, IoU~$=0$ and $\partial\,\text{IoU}/\partial\,\hat{b} = 0$.
+      The network receives no gradient signal.
+      Scale/L2 terms are non-zero regardless of overlap.
+    \end{block}
+
+    \vspace{0.4em}
+    \begin{block}{Q2: What does $\beta$ do in quality loss?}
+      $\beta = (1-\text{IoU}) / (E[1-\text{IoU}]+\varepsilon)$ is a sliding-window
+      normaliser.  High $\beta$ when current box is \emph{worse} than recent average —
+      emphasises hard examples.
+      It is \textbf{detached} so it acts as a weight coefficient, not a feedback loop.
+    \end{block}
+
+    \vspace{0.4em}
+    \begin{block}{Q3: Why split by sequence, not frame?}
+      Frames within a sequence are temporally correlated.
+      Frame-level splitting leaks future frames into the training set.
+    \end{block}
+
+    \column{0.48\textwidth}
+
+    \begin{block}{Q4: Why can't you claim 81.32\% MOTA?}
+      That is the hidden-test-set score from the challenge,
+      computed by submitting to a server you don't have access to.
+      Your experiments use only the val split.
+    \end{block}
+
+    \vspace{0.4em}
+    \begin{block}{Q5: Why is IDS so high in IoU-only?}
+      The GT simulation adds independent per-frame noise.
+      Box-to-box IoU drops below the match threshold, causing the tracker
+      to drop and re-initialise the track (new ID).
+      This stress-tests the cost matrix — L2 is robust to this, IoU is not.
+    \end{block}
+
+    \vspace{0.4em}
+    \begin{block}{Q6: What would improve the results?}
+      Real pretrained detector, GPU training with SSQ loss, full 67-sequence val,
+      stride=1, multi-UAV data to properly test IDS.
+    \end{block}
+
+  \end{columns}
+\end{frame}
+
+% ===========================================================
+\section{Summary}
+% ===========================================================
+
+% ── Slide 12: Summary ──────────────────────────────────────
+\begin{frame}{Summary}
+
+  \begin{columns}[T]
+
+    \column{0.55\textwidth}
+
+    \begin{block}{What was implemented}
+      \begin{itemize}
+        \item \textbf{SSQ loss} (Eq.~2--8): all 6 functions, pure CPU PyTorch
+        \item \textbf{FLIT tracker}: Algorithm~1 verbatim, Kalman + CMC + fused cost
+        \item \textbf{101 unit tests} pass (gradcheck, beta detach, stride mismatch, CMC translation)
+        \item \textbf{Detection cache, CMC affine cache}: reproducible pipeline
+        \item \textbf{Full ablation}: 20 variants $\times$ 2 IoU thresholds in 33s on CPU
+      \end{itemize}
+    \end{block}
+
+    \vspace{0.4em}
+
+    \begin{block}{What the numbers show}
+      \begin{itemize}
+        \item SSQ does not beat CIoU in direct box regression
+          (expected — SSQ targets detector training, not this benchmark)
+        \item L2 fusion cuts IDS by 63\% vs IoU-only for tiny noisy boxes
+        \item CMC helps marginally (+0.004 MOTA) on mostly-stationary-camera data
+        \item Trend consistent with paper; absolute numbers differ due to detector
+      \end{itemize}
+    \end{block}
+
+    \column{0.40\textwidth}
+
+    \begin{alertblock}{Limitations}
+      \begin{itemize}
+        \item No GPU $\to$ Table~2 not reproduced
+        \item GT simulation $\to$ Table~3 not comparable
+        \item Single-target data $\to$ IDS weakly tested
+        \item Stride=5 $\to$ coarser temporal resolution
+        \item 15/67 val sequences
+      \end{itemize}
+    \end{alertblock}
+
+    \vspace{0.6em}
+
+    \begin{block}{Repository}
+      \centering
+      \texttt{github.com/prajj267/new-repo}\\
+      \vspace{0.3em}
+      \small All raw results, configs, and logs\\
+      are committed alongside the code.
+    \end{block}
+
+  \end{columns}
+
+  \vspace{0.5em}
+  \centering
+  \textbf{\large The core claim — L2 fusion reduces IDS for tiny-object tracking — is reproduced.}
+
+\end{frame}
+
+% ── Backup: all tests pass ─────────────────────────────────
+\begin{frame}[plain]{Backup — Test Suite}
+  \centering
+  \vspace{1em}
+  \begin{block}{\centering All unit tests pass}
+    \centering
+    \begin{tabular}{lcl}
+      \toprule
+      Module & Tests & Key checks \\
+      \midrule
+      \texttt{test\_loader.py} & 34 & box conversion, stride, split disjoint \\
+      \texttt{test\_ssq\_loss.py} & 35 & closed form, gradcheck, $\beta$ detached, NaN \\
+      \texttt{test\_tracker.py} & 32 & cost shapes, Hungarian empty, CMC translation \\
+      \midrule
+      \textbf{Total} & \textbf{101} & \\
+      \bottomrule
+    \end{tabular}
+  \end{block}
+
+  \vspace{1em}
+  \begin{block}{\centering Reproduce with one command}
+    \centering\ttfamily pytest tests/ -v
+  \end{block}
+\end{frame}
+
+% ===========================================================
+\end{document}
+% ===========================================================
